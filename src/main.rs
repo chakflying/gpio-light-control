@@ -1,17 +1,18 @@
 use rppal::gpio::Gpio;
-use std::{net::SocketAddr, sync::Arc, collections::HashMap};
+use std::{collections::HashMap, fs, net::SocketAddr, sync::Arc};
 
 use axum::{
     extract::Query,
     extract::State,
     http::StatusCode,
-    response::IntoResponse,
+    response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
     Router,
 };
 
 struct AppState {
     gpio: Gpio,
+    index: String,
 }
 
 #[tokio::main]
@@ -20,6 +21,8 @@ async fn main() {
 
     let shared_state = Arc::new(AppState {
         gpio: Gpio::new().expect("Cannot create GPIO instance."),
+        index: fs::read_to_string("src/index.html")
+            .unwrap_or(String::from("Failed to read index.html")),
     });
 
     // build our application with a route
@@ -41,15 +44,12 @@ async fn main() {
 }
 
 // basic handler that responds with a static string
-async fn root() -> &'static str {
-    "Raspberry Pi LED control"
+async fn root(State(state): State<Arc<AppState>>) -> Html<String> {
+    return Html(state.index.clone());
 }
 
 // get pin as output and set state according to request body
-async fn led_control(
-    State(state): State<Arc<AppState>>,
-    body: String,
-) -> impl IntoResponse {
+async fn led_control(State(state): State<Arc<AppState>>, body: String) -> Response {
     let pin = state.gpio.get(23);
     match pin {
         Ok(pin) => {
@@ -63,17 +63,17 @@ async fn led_control(
             }
         }
         Err(_) => {
-            return (StatusCode::SERVICE_UNAVAILABLE, "Failed to get pin");
+            return (StatusCode::SERVICE_UNAVAILABLE, "Failed to get pin").into_response();
         }
     }
 
-    (StatusCode::OK, "OK")
+    Redirect::to("/").into_response()
 }
 
 async fn led_control_get(
     State(state): State<Arc<AppState>>,
     Query(params): Query<HashMap<String, String>>,
-) -> impl IntoResponse {
+) -> Response {
     let pin = state.gpio.get(23);
     match pin {
         Ok(pin) => {
@@ -87,9 +87,9 @@ async fn led_control_get(
             }
         }
         Err(_) => {
-            return (StatusCode::SERVICE_UNAVAILABLE, "Failed to get pin");
+            return (StatusCode::SERVICE_UNAVAILABLE, "Failed to get pin").into_response();
         }
     }
 
-    (StatusCode::OK, "OK")
+    Redirect::to("/").into_response()
 }
