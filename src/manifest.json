@@ -1,0 +1,16 @@
+{
+    "name": "Light Control",
+    "short_name": "LightControl",
+    "start_url": ".",
+    "display": "fullscreen",
+    "background_color": "#fff",
+    "description": "A simple app for controlling LED lights.",
+    "icons": [
+      {
+        "src": "icon.svg",
+        "sizes": "any",
+        "type": "image/svg"
+      }
+    ]
+  }
+  

@@ -2,9 +2,8 @@ use rppal::gpio::Gpio;
 use std::{collections::HashMap, fs, net::SocketAddr, sync::Arc};
 
 use axum::{
-    extract::Query,
-    extract::State,
-    http::StatusCode,
+    extract::{Path, Query, State},
+    http::{StatusCode, header},
     response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
     Router,
@@ -13,6 +12,8 @@ use axum::{
 struct AppState {
     gpio: Gpio,
     index: String,
+    icon: String,
+    manifest: String,
 }
 
 #[tokio::main]
@@ -23,14 +24,18 @@ async fn main() {
         gpio: Gpio::new().expect("Cannot create GPIO instance."),
         index: fs::read_to_string("src/index.html")
             .unwrap_or(String::from("Failed to read index.html")),
+        icon: fs::read_to_string("src/icon.svg").unwrap_or(String::from("Failed to read icon.svg")),
+        manifest: fs::read_to_string("src/manifest.json")
+            .unwrap_or(String::from("Failed to read manifest.json")),
     });
 
     // build our application with a route
     let app = Router::new()
         // `GET /` goes to `root`
-        .route("/", get(root))
         .route("/led", post(led_control))
         .route("/led", get(led_control_get))
+        .route("/:file", get(file))
+        .route("/", get(root))
         .with_state(shared_state);
 
     // run our app with hyper
@@ -43,9 +48,25 @@ async fn main() {
         .unwrap();
 }
 
-// basic handler that responds with a static string
 async fn root(State(state): State<Arc<AppState>>) -> Html<String> {
     return Html(state.index.clone());
+}
+
+// basic handler that responds with a static string
+async fn file(State(state): State<Arc<AppState>>, Path(file): Path<String>) -> Response {
+    return match file.as_str() {
+        "manifest.json" => (
+            StatusCode::OK,
+            [(header::CONTENT_TYPE, "application/json")],
+            state.manifest.clone(),
+        ).into_response(),
+        "icon.svg" => (
+            StatusCode::OK, 
+            [(header::CONTENT_TYPE, "image/svg+xml")],
+            state.icon.clone(),
+        ).into_response(),
+        _ => return (StatusCode::NOT_FOUND, "").into_response(),
+    }
 }
 
 // get pin as output and set state according to request body
